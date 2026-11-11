@@ -1,0 +1,152 @@
+"use client";
+
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { CalendarDays, ChevronLeft, MapPin, Share2, Users, Zap, Flag, TriangleAlert } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { toast } from "sonner";
+import { GoogleMapDirectionsLink, GoogleMapPreview } from "@/components/maps/google-map-preview";
+import { StatePanel } from "@/components/shared/state-panel";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { isApiError } from "@/lib/api/client";
+import { friendlyErrorMessage } from "@/lib/api/error-messages";
+import { formatGameDay, formatGameTimeRange } from "@/lib/datetime/eastern-time";
+import { SPORT_LABEL, skillLevelLabel } from "../game-state";
+import { useGameDetail } from "../hooks";
+import type { Game } from "../types";
+import { CampaignBadge, MetaTag } from "./game-bits";
+
+/** Details are public; `joinPanel` is server-rendered so it can know who's signed in. */
+export function GameDetailScreen({ joinPanel }: { joinPanel: ReactNode }) {
+  const { slug } = useParams<{ slug: string }>();
+  const query = useGameDetail(slug);
+  if (query.isPending) return <GameDetailSkeleton />;
+  if (query.isError) return <GameLoadError error={query.error} retry={() => query.refetch()} />;
+  const game = query.data;
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-x-8">
+      <GameHero game={game} />
+      <aside className="grid content-start gap-4 lg:col-start-2 lg:row-span-3 lg:row-start-1">
+        {joinPanel}
+        <ShareButton game={game} />
+        <OrganizerCard game={game} />
+      </aside>
+      <InfoTiles game={game} />
+      <AboutGame game={game} />
+    </div>
+  );
+}
+
+export function GameDetailSkeleton() {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]" aria-busy="true" aria-label="Loading game">
+      <Skeleton className="h-64 lg:h-80" />
+      <Skeleton className="h-72" />
+    </div>
+  );
+}
+
+function GameLoadError({ error, retry }: { error: Error; retry: () => void }) {
+  if (isApiError(error) && error.code === "NOT_FOUND") {
+    const action = <Button nativeButton={false} render={<Link href="/games" />}>Find a game</Button>;
+    return <StatePanel icon={Flag} title="Game not found" description="This game doesn’t exist, or it hasn’t been confirmed by its organizer yet." action={action} />;
+  }
+  return <StatePanel icon={TriangleAlert} tone="error" title="Couldn’t load this game" description={friendlyErrorMessage(error)} action={<Button onClick={retry}>Try again</Button>} />;
+}
+
+export function BackToGames() {
+  return (
+    <Link href="/games" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <ChevronLeft className="size-4" aria-hidden /> Find Games
+    </Link>
+  );
+}
+
+function GameHero({ game }: { game: Game }) {
+  return (
+    <header className="cover-stripes flex min-h-56 flex-col justify-end rounded-lg border border-border p-5 sm:min-h-72 sm:p-6">
+      <div className="flex flex-wrap items-center gap-2">
+        {game.campaign && <CampaignBadge name={game.campaign.name} />}
+        <MetaTag>{SPORT_LABEL}</MetaTag>
+        {game.status !== "PUBLISHED" && <MetaTag>{game.status === "CLOSED" ? "Closed" : "Cancelled"}</MetaTag>}
+      </div>
+      <h1 className="font-display mt-3 text-[clamp(2rem,6vw,3.25rem)] leading-[0.95]">{game.title}</h1>
+    </header>
+  );
+}
+
+function InfoTile({ icon: Icon, label, value, detail }: { icon: LucideIcon; label: string; value: string; detail?: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <Icon className="size-4 text-primary" aria-hidden />
+      <p className="mt-2 font-mono text-[10px] tracking-widest text-muted-foreground uppercase">{label}</p>
+      <p className="mt-1 font-semibold">{value}</p>
+      {detail && <p className="text-sm text-muted-foreground">{detail}</p>}
+    </div>
+  );
+}
+
+function InfoTiles({ game }: { game: Game }) {
+  const { location } = game;
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <InfoTile icon={CalendarDays} label="Date & time" value={formatGameDay(game.startDateTime)} detail={formatGameTimeRange(game.startDateTime, game.endDateTime)} />
+      <InfoTile icon={MapPin} label="Location" value={location.venueName} detail={`${location.city}, ${location.state}`} />
+      <InfoTile icon={Zap} label="Skill level" value={skillLevelLabel(game.skillLevel)} />
+      <InfoTile icon={Users} label="Spots" value={`${game.availableSpots} of ${game.capacity} left`} />
+    </div>
+  );
+}
+
+function fullAddress({ location }: Game): string {
+  return [location.venueName, location.address, `${location.city}, ${location.state} ${location.postalCode ?? ""}`.trim()].filter(Boolean).join(", ");
+}
+
+function AboutGame({ game }: { game: Game }) {
+  const address = fullAddress(game);
+  return (
+    <div className="grid gap-8 md:grid-cols-2">
+      <section>
+        <h2 className="font-display text-2xl">About this game</h2>
+        <p className="mt-2 whitespace-pre-line text-muted-foreground">{game.description || "The organizer hasn’t added a description."}</p>
+      </section>
+      <section>
+        <h2 className="font-display text-2xl">Location</h2>
+        <GoogleMapPreview address={address} label={`Map of ${game.location.venueName}`} className="mt-3 h-48 sm:h-56" />
+        <p className="mt-3 text-muted-foreground">{address}</p>
+        <GoogleMapDirectionsLink address={address} className="mt-2" />
+      </section>
+    </div>
+  );
+}
+
+function ShareButton({ game }: { game: Game }) {
+  async function share() {
+    const url = `${window.location.origin}/games/${game.slug}`;
+    if (navigator.share) return navigator.share({ title: game.title, url }).catch(() => undefined);
+    await navigator.clipboard.writeText(url).then(() => toast.success("Link copied"), () => toast.error("Couldn’t copy the link"));
+  }
+  return (
+    <Button variant="outline" size="lg" className="w-full" onClick={share}>
+      <Share2 aria-hidden /> Share with friends
+    </Button>
+  );
+}
+
+function OrganizerCard({ game }: { game: Game }) {
+  const initials = game.organizer.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-4">
+      <Avatar className="size-11">
+        <AvatarFallback className="bg-secondary font-semibold">{initials}</AvatarFallback>
+      </Avatar>
+      <div>
+        <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Organizer</p>
+        <p className="font-semibold">{game.organizer.name}</p>
+      </div>
+    </div>
+  );
+}
