@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { LISTABLE_CAMPAIGN } from "@/config/campaigns";
 import { easternToUtcIso } from "@/lib/datetime/eastern-time";
 import { gamesApi } from "../api";
-import { API_FIELD_TO_FORM_FIELD, costCentsOf, EMPTY_LISTING, isScheduleReady, listingSchema, toSubmitGameInput, type ListingValues } from "../schemas";
+import { API_FIELD_TO_FORM_FIELD, costBasisOf, costCentsOf, EMPTY_LISTING, isScheduleReady, listingSchema, toSubmitGameInput, type ListingValues } from "../schemas";
 import type { ListingReceipt, SkillLevel } from "../types";
 import { FormSection, GameFields } from "./game-fields";
 import { GameCard } from "./game-card";
@@ -83,8 +83,10 @@ function previewOf(values: ListingValues) {
     title: values.title || "Your game name",
     skillLevel: (values.skillLevel || null) as SkillLevel | null,
     costCents: costCentsOf(values),
+    costBasis: costBasisOf(values),
     startDateTime: previewStart(values),
     endDateTime: isScheduleReady(values.date, values.endTime) ? easternToUtcIso(values.date, values.endTime) : null,
+    registrationType: values.registrationType,
     capacity,
     availableSpots: capacity,
     location: { venueName: values.venueName || "Park or field", address: null, city: values.city, state: values.state, postalCode: null },

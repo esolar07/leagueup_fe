@@ -18,8 +18,11 @@ describe("cents conversion", () => {
     expect(centsToDollars(5)).toBe("0.05");
   });
   it("displays null as not listed and 0 as Free", () => {
-    expect(formatCost(null)).toBe("Cost not listed");
+    expect(formatCost(null)).toBe("Free");
     expect(formatCost(0)).toBe("Free");
     expect(formatCost(1050)).toBe("$10.50");
+    expect(formatCost(2000, "PER_PLAYER")).toBe("$20 per player");
+    expect(formatCost(12000, "PER_TEAM")).toBe("$120 per team");
+    expect(formatCost(0, "PER_TEAM")).toBe("Free");
   });
 });

@@ -3,7 +3,7 @@ import { LISTABLE_CAMPAIGN } from "@/config/campaigns";
 import { easternToUtcIso, utcToEasternParts } from "@/lib/datetime/eastern-time";
 import { centsToDollars, dollarsToCents, DOLLARS_PATTERN } from "@/lib/money";
 import { SKILL_LEVELS } from "./filters";
-import type { Game, GuestIdentity, SkillLevel, SubmitGameInput, UpdateGameInput } from "./types";
+import type { CostBasis, Game, GuestIdentity, SkillLevel, SubmitGameInput, UpdateGameInput } from "./types";
 
 /** Kept in step with leagueup_be/src/modules/games/game.schemas.ts. The backend remains authoritative. */
 const SINGLE_LINE = /^[^\r\n]*$/;
@@ -25,11 +25,14 @@ const gameFieldsShape = {
   city: requiredLine("City", 120),
   state: z.string().trim().regex(/^[A-Za-z]{2}$/, "Use the 2-letter state code, like FL."),
   postalCode: z.string().trim().regex(/^(\d{5})?$/, "Use a 5-digit ZIP code."),
-  capacity: z.string().trim().regex(/^\d+$/, "Enter a whole number.").refine((value) => Number(value) >= 1 && Number(value) <= 200, "Between 1 and 200 players."),
+  registrationType: z.enum(["PLAYER", "TEAM"]),
+  capacity: z.string().trim().regex(/^\d+$/, "Enter a whole number.").refine((value) => Number(value) >= 1 && Number(value) <= 200, "Between 1 and 200."),
   skillLevel: z.enum(["", ...SKILL_LEVELS]),
   /** "" = not listed (only for older games); "free" = $0; "paid" = `cost` dollars. */
   costType: z.enum(["", "free", "paid"]),
   cost: z.string().trim().refine((value) => value === "" || DOLLARS_PATTERN.test(value), "Enter an amount like 10 or 10.50."),
+  /** Only sent when the game has a price above $0. */
+  costBasis: z.enum(["PER_PLAYER", "PER_TEAM"], "Choose per player or per team."),
 };
 
 type ScheduleValues = { date: string; startTime: string; endTime: string };
@@ -38,7 +41,7 @@ type CostValues = { costType: "" | "free" | "paid"; cost: string };
 /** Paid needs a price above $0. */
 function checkCost({ costType, cost }: CostValues, context: z.RefinementCtx) {
   if (costType !== "paid" || (DOLLARS_PATTERN.test(cost) && dollarsToCents(cost) > 0)) return;
-  context.addIssue({ code: "custom", path: ["cost"], message: "Enter the price per player, like 10 or 10.50." });
+  context.addIssue({ code: "custom", path: ["cost"], message: "Enter a price, like 10 or 10.50." });
 }
 
 function checkGame(values: ScheduleValues & CostValues, context: z.RefinementCtx) {
@@ -49,6 +52,11 @@ function checkGame(values: ScheduleValues & CostValues, context: z.RefinementCtx
 export function costCentsOf({ costType, cost }: CostValues): number | null {
   if (costType === "free") return 0;
   return costType === "paid" && DOLLARS_PATTERN.test(cost) ? dollarsToCents(cost) : null;
+}
+
+/** The API requires a basis on priced games and rejects one on free or unlisted games. */
+export function costBasisOf(values: CostValues & { costBasis: CostBasis }): CostBasis | null {
+  return (costCentsOf(values) ?? 0) > 0 ? values.costBasis : null;
 }
 
 /** True once a date and time are complete enough to convert (half-typed input never throws). */
@@ -84,9 +92,11 @@ export const API_FIELD_TO_FORM_FIELD: Record<string, keyof ListingValues> = {
   city: "city",
   state: "state",
   postalCode: "postalCode",
+  registrationType: "registrationType",
   capacity: "capacity",
   skillLevel: "skillLevel",
   costCents: "cost",
+  costBasis: "costBasis",
   organizerName: "organizerName",
   organizerEmail: "organizerEmail",
   campaignSlug: "joinCampaign",
@@ -99,12 +109,15 @@ export const listingSchema = z
   .superRefine(checkGame);
 
 export const guestJoinSchema = z.object({ name: requiredLine("Your name", 120), email });
+export const teamNameSchema = z.object({ teamName: requiredLine("Team name", 120) });
+/** TEAM games: the captain's name and email plus the team. */
+export const teamJoinSchema = z.object({ name: requiredLine("Captain name", 120), email, ...teamNameSchema.shape });
 export const resendLinkSchema = z.object({ email });
 export const emailCaptureSchema = z.object({ email });
 
 export type GameFieldValues = z.infer<typeof editGameSchema>;
 export type ListingValues = z.infer<typeof listingSchema>;
-export type GuestJoinValues = GuestIdentity;
+export type GuestJoinValues = GuestIdentity & { teamName?: string };
 
 export const EMPTY_LISTING: ListingValues = {
   title: "",
@@ -117,10 +130,12 @@ export const EMPTY_LISTING: ListingValues = {
   city: "",
   state: "",
   postalCode: "",
+  registrationType: "PLAYER",
   capacity: "",
   skillLevel: "",
   costType: "free",
   cost: "",
+  costBasis: "PER_PLAYER",
   joinCampaign: false,
   organizerName: "",
   organizerEmail: "",
@@ -140,9 +155,11 @@ function toFlatGame(values: GameFieldValues): Required<Omit<UpdateGameInput, "st
     city: values.city,
     state: values.state.toUpperCase(),
     postalCode: blankToNull(values.postalCode),
+    registrationType: values.registrationType,
     capacity: Number(values.capacity),
     skillLevel: (values.skillLevel || null) as SkillLevel | null,
     costCents: costCentsOf(values),
+    costBasis: costBasisOf(values),
   };
 }
 
@@ -168,17 +185,27 @@ export function gameToFormValues(game: Game): GameFieldValues {
     city: location.city,
     state: location.state,
     postalCode: location.postalCode ?? "",
+    registrationType: game.registrationType,
     capacity: String(game.capacity),
     skillLevel: game.skillLevel ?? "",
     costType: game.costCents === null ? "" : game.costCents === 0 ? "free" : "paid",
     cost: game.costCents ? centsToDollars(game.costCents) : "",
+    costBasis: game.costBasis ?? "PER_PLAYER",
   };
 }
 
-/** Only fields that changed, so an unchanged (and possibly soon) start time is never re-validated as "future". */
+/**
+ * Only fields that changed, so an unchanged (and possibly soon) start time is never re-validated as "future".
+ * A price change carries its basis; making a game free sends only the price, and the API clears the basis.
+ */
 export function diffGameChanges(game: Game, values: GameFieldValues): UpdateGameInput {
   const original = toFlatGame(gameToFormValues(game));
-  const edited = toFlatGame(values);
+  const { costCents, costBasis, ...edited } = toFlatGame(values);
   const changed = Object.entries(edited).filter(([key, value]) => original[key as keyof typeof original] !== value);
-  return Object.fromEntries(changed) as UpdateGameInput;
+  const priceChanged = costCents !== original.costCents || costBasis !== original.costBasis;
+  return { ...Object.fromEntries(changed), ...(priceChanged && priceChanges(costCents, costBasis)) } as UpdateGameInput;
+}
+
+function priceChanges(costCents: number | null, costBasis: CostBasis | null): UpdateGameInput {
+  return costBasis ? { costCents, costBasis } : { costCents };
 }

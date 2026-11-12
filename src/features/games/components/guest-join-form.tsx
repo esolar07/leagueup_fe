@@ -10,16 +10,18 @@ import { Button } from "@/components/ui/button";
 import { FieldError, FieldGroup } from "@/components/ui/field";
 import { gamesApi } from "../api";
 import { gameKeys } from "../hooks";
-import { guestJoinSchema, type GuestJoinValues } from "../schemas";
+import { isTeamGame } from "../game-state";
+import { guestJoinSchema, teamJoinSchema, type GuestJoinValues } from "../schemas";
 import type { Game, JoinResult } from "../types";
 
-const GUEST_FIELDS = ["name", "email"] as const;
+const GUEST_FIELDS = ["name", "email", "teamName"] as const;
 const guestFieldFor = (apiField: string) => GUEST_FIELDS.find((field) => field === apiField);
 
-/** Join without an account: name + email. The API emails a link to cancel later. */
+/** Join without an account: name + email, plus the team name on TEAM games. The API emails a link to cancel later. */
 export function GuestJoinForm({ game, onJoined }: { game: Game; onJoined: (result: JoinResult) => void }) {
   const queryClient = useQueryClient();
-  const form = useForm<GuestJoinValues>({ resolver: zodResolver(guestJoinSchema), defaultValues: { name: "", email: "" } });
+  const team = isTeamGame(game);
+  const form = useForm<GuestJoinValues>({ resolver: zodResolver(team ? teamJoinSchema : guestJoinSchema), defaultValues: { name: "", email: "", teamName: "" } });
   const { errors, isSubmitting } = form.formState;
   async function onSubmit(values: GuestJoinValues) {
     try {
@@ -30,14 +32,15 @@ export function GuestJoinForm({ game, onJoined }: { game: Game; onJoined: (resul
     void queryClient.invalidateQueries({ queryKey: gameKeys.detail(game.slug) });
   }
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} noValidate aria-label="Request to join">
+    <form onSubmit={form.handleSubmit(onSubmit)} noValidate aria-label={team ? "Register your team" : "Request to join"}>
       <FieldGroup className="gap-4">
-        <TextField id="join-name" label="Your name" autoComplete="name" registration={form.register("name")} error={errors.name} />
-        <TextField id="join-email" label="Email" type="email" autoComplete="email" description="We email your confirmation and a link to cancel here." registration={form.register("email")} error={errors.email} />
+        {team && <TextField id="join-team-name" label="Team name" autoComplete="organization" registration={form.register("teamName")} error={errors.teamName} />}
+        <TextField id="join-name" label={team ? "Captain name" : "Your name"} autoComplete="name" registration={form.register("name")} error={errors.name} />
+        <TextField id="join-email" label={team ? "Captain email" : "Email"} type="email" autoComplete="email" description="We email your confirmation and a link to cancel here." registration={form.register("email")} error={errors.email} />
         <FieldError errors={[errors.root]} />
         <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
           {isSubmitting && <Loader2 className="animate-spin" aria-hidden />}
-          {isSubmitting ? "Sending request…" : "Request to join"}
+          {isSubmitting ? "Sending request…" : team ? "Register your team" : "Request to join"}
         </Button>
       </FieldGroup>
     </form>

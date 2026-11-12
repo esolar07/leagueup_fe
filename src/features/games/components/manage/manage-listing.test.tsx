@@ -12,7 +12,7 @@ vi.mock("sonner", () => ({ toast }));
 
 const game = buildGame();
 const detail = { method: "GET", path: "/games/turkey-bowl-7v7", body: success({ game, myParticipation: null }) };
-const pending = [{ id: "p1", name: "Sofia Reyes", status: "PENDING", requestedAt: "2026-11-10T15:00:00.000Z" }];
+const pending = [{ id: "p1", name: "Sofia Reyes", teamName: null, status: "PENDING", requestedAt: "2026-11-10T15:00:00.000Z" }];
 
 beforeEach(() => {
   window.history.replaceState(null, "", "/games/turkey-bowl-7v7/manage#token=manage-secret");
@@ -61,6 +61,27 @@ describe("manage listing page", () => {
     renderWithProviders(<ManageListing />);
     await userEvent.click(await screen.findByRole("button", { name: "Approve Sofia Reyes" }));
     expect(toast.error).toHaveBeenCalledWith("This game is full.");
+  });
+  it("lists TEAM requests by team name, with the captain underneath", async () => {
+    const teamRequest = [{ ...pending[0], teamName: "Gobblers" }];
+    mockApi([detail, { method: "GET", path: "/games/game_1/participants", body: success({ participants: teamRequest }, { totalPages: 1 }) }]);
+    renderWithProviders(<ManageListing />);
+    expect(await screen.findByText("Gobblers")).toBeInTheDocument();
+    expect(screen.getByText("Captain: Sofia Reyes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve Gobblers" })).toBeInTheDocument();
+  });
+  it("shows the 422 message when switching players and teams is refused", async () => {
+    mockApi([
+      detail,
+      { method: "GET", path: "/games/game_1/participants", body: success({ participants: pending }, { totalPages: 1 }) },
+      { method: "PATCH", path: "/games/game_1", status: 422, body: failure("UNPROCESSABLE", "Players or teams cannot be switched once a join request exists.") },
+    ]);
+    renderWithProviders(<ManageListing />);
+    await userEvent.click(await screen.findByRole("tab", { name: "Edit game" }));
+    await userEvent.click(await screen.findByRole("radio", { name: "Teams" }));
+    expect(screen.getByLabelText("Teams needed")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Players or teams cannot be switched once a join request exists.")).toBeInTheDocument();
   });
   it("cancels the game only after confirmation, with DELETE and the manage token", async () => {
     const calls = mockApi([

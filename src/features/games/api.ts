@@ -2,7 +2,7 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   GameDetail,
   Game,
-  GuestIdentity,
+  GuestJoinInput,
   JoinResult,
   ListingReceipt,
   ManagedParticipant,
@@ -31,9 +31,10 @@ export const gamesApi = {
   verify: (token: string) => apiRequest<ListingReceipt>("/games/verify", { method: "POST", body: { token } }),
   resendLink: (gameId: string, email: string) =>
     apiRequest<{ accepted: true }>(`${gamePath(gameId)}/resend-link`, { method: "POST", body: { email } }),
-  joinAsGuest: (gameId: string, guest: GuestIdentity) =>
+  joinAsGuest: (gameId: string, guest: GuestJoinInput) =>
     apiRequest<JoinResult>(`${gamePath(gameId)}/join`, { method: "POST", body: guest }),
-  joinAsMember: (gameId: string, bearer: string) => apiRequest<JoinResult>(`${gamePath(gameId)}/join`, { method: "POST", token: bearer }),
+  joinAsMember: (gameId: string, bearer: string, teamName?: string) =>
+    apiRequest<JoinResult>(`${gamePath(gameId)}/join`, { method: "POST", token: bearer, body: teamName ? { teamName } : undefined }),
   update: (gameId: string, changes: UpdateGameInput, manageToken: string) =>
     apiRequest<{ game: Game }>(gamePath(gameId), { method: "PATCH", body: changes, headers: manageHeaders(manageToken) }),
   cancel: (gameId: string, manageToken: string) =>

@@ -26,7 +26,7 @@ export function MetaTag({ children, highlight }: { children: ReactNode; highligh
 const MAX_SEGMENTS = 10;
 
 /** Segmented bar: lime segments are the share of spots still open. Decorative; the label carries the meaning. Hidden until a capacity exists (draft preview). */
-export function SpotsMeter({ game, className }: { game: Pick<Game, "capacity" | "availableSpots">; className?: string }) {
+export function SpotsMeter({ game, className }: { game: Pick<Game, "capacity" | "availableSpots" | "registrationType">; className?: string }) {
   if (game.capacity === 0) return null;
   const segments = Math.min(game.capacity, MAX_SEGMENTS);
   const open = Math.round((game.availableSpots / Math.max(game.capacity, 1)) * segments);

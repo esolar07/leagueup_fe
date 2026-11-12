@@ -23,8 +23,8 @@ async function withSession<T>(request: (bearer: string) => Promise<{ data: T }>)
   }
 }
 
-export async function joinAsMemberAction(gameId: string): Promise<MemberActionResult<JoinResult>> {
-  return withSession((bearer) => gamesApi.joinAsMember(gameId, bearer));
+export async function joinAsMemberAction(gameId: string, teamName?: string): Promise<MemberActionResult<JoinResult>> {
+  return withSession((bearer) => gamesApi.joinAsMember(gameId, bearer, teamName));
 }
 
 export async function cancelMyRequestAction(gameId: string, participantId: string): Promise<MemberActionResult<{ participant: OwnParticipation }>> {

@@ -1,4 +1,4 @@
-import type { Game, ParticipantStatus, SkillLevel } from "./types";
+import type { Game, ManagedParticipant, ParticipantStatus, RegistrationType, SkillLevel } from "./types";
 
 export type GameAvailability = "open" | "full" | "closed" | "cancelled" | "started";
 
@@ -49,10 +49,28 @@ export const PARTICIPANT_STATUS_LABELS: Record<ParticipantStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
-export function spotsLabel(game: Pick<Game, "availableSpots">): string {
-  if (game.availableSpots === 0) return "Full";
-  return `${game.availableSpots} ${game.availableSpots === 1 ? "spot" : "spots"} left`;
+export function isTeamGame(game: Pick<Game, "registrationType">): boolean {
+  return game.registrationType === "TEAM";
 }
+
+/** "player" / "teams": what capacity counts on this kind of game. */
+export function spotUnit(registrationType: RegistrationType, count: number): string {
+  const unit = registrationType === "TEAM" ? "team" : "player";
+  return count === 1 ? unit : `${unit}s`;
+}
+
+/** "12 of 40 players left", "3 of 8 teams left", or "Full". */
+export function spotsLabel(game: Pick<Game, "availableSpots" | "capacity" | "registrationType">): string {
+  if (game.availableSpots === 0) return "Full";
+  return `${game.availableSpots} of ${game.capacity} ${spotUnit(game.registrationType, game.capacity)} left`;
+}
+
+/** The team on TEAM-game requests, otherwise the player. */
+export function participantLabel(participant: Pick<ManagedParticipant, "name" | "teamName">): string {
+  return participant.teamName ?? participant.name;
+}
+
+export const TEAM_REGISTRATION_LABEL = "Team registration";
 
 export function locationLine({ location }: Pick<Game, "location">): string {
   return `${location.venueName}, ${location.city}`;

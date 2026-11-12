@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { friendlyErrorMessage } from "@/lib/api/error-messages";
 import { formatGameDay, formatGameTime } from "@/lib/datetime/eastern-time";
 import { gamesApi } from "../../api";
-import { availabilityOf, PARTICIPANT_STATUS_LABELS } from "../../game-state";
+import { availabilityOf, PARTICIPANT_STATUS_LABELS, participantLabel } from "../../game-state";
 import { gameKeys } from "../../hooks";
 import type { Game, ManagedParticipant, ParticipantStatus } from "../../types";
 import { useParticipants } from "./use-participants";
@@ -43,7 +43,7 @@ function useDecide(game: Game, manageToken: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ participant, status }: { participant: ManagedParticipant; status: Decision }) => gamesApi.decide(game.id, participant.id, status, manageToken),
-    onSuccess: ({ data }) => toast.success(`${data.participant.name} ${data.participant.status === "APPROVED" ? "approved" : "declined"}`),
+    onSuccess: ({ data }) => toast.success(`${participantLabel(data.participant)} ${data.participant.status === "APPROVED" ? "approved" : "declined"}`),
     onError: (error) => toast.error(friendlyErrorMessage(error)),
     onSettled: () =>
       Promise.all([
@@ -73,16 +73,17 @@ export function ParticipantRequests({ game, manageToken }: { game: Game; manageT
           <li key={participant.id} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center">
             <div className="flex flex-1 items-center gap-3">
               <Avatar className="size-10">
-                <AvatarFallback className="bg-secondary font-semibold">{participant.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarFallback className="bg-secondary font-semibold">{participantLabel(participant).slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div>
-                <p className="font-semibold">{participant.name}</p>
+                <p className="font-semibold">{participantLabel(participant)}</p>
+                {participant.teamName && <p className="text-sm text-muted-foreground">Captain: {participant.name}</p>}
                 <p className="text-xs text-muted-foreground">
                   {PARTICIPANT_STATUS_LABELS[participant.status]} · requested {formatGameDay(participant.requestedAt)}, {formatGameTime(participant.requestedAt)}
                 </p>
               </div>
             </div>
-            <DecisionButtons decisions={allowedDecisions(game, participant)} name={participant.name} disabled={decide.isPending} onDecide={(decision) => decide.mutate({ participant, status: decision })} />
+            <DecisionButtons decisions={allowedDecisions(game, participant)} name={participantLabel(participant)} disabled={decide.isPending} onDecide={(decision) => decide.mutate({ participant, status: decision })} />
           </li>
         ))}
       </ul>

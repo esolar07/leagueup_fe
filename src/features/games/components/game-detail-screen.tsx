@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isApiError } from "@/lib/api/client";
 import { friendlyErrorMessage } from "@/lib/api/error-messages";
 import { formatGameDay, formatGameTimeRange } from "@/lib/datetime/eastern-time";
-import { SPORT_LABEL, skillLevelLabel } from "../game-state";
+import { isTeamGame, SPORT_LABEL, skillLevelLabel, spotsLabel, TEAM_REGISTRATION_LABEL } from "../game-state";
 import { useGameDetail } from "../hooks";
 import type { Game } from "../types";
 import { CampaignBadge, MetaTag } from "./game-bits";
@@ -71,6 +71,7 @@ function GameHero({ game }: { game: Game }) {
       <div className="flex flex-wrap items-center gap-2">
         {game.campaign && <CampaignBadge name={game.campaign.name} />}
         <MetaTag>{SPORT_LABEL}</MetaTag>
+        {isTeamGame(game) && <MetaTag>{TEAM_REGISTRATION_LABEL}</MetaTag>}
         {game.status !== "PUBLISHED" && <MetaTag>{game.status === "CLOSED" ? "Closed" : "Cancelled"}</MetaTag>}
       </div>
       <h1 className="font-display mt-3 text-[clamp(2rem,6vw,3.25rem)] leading-[0.95]">{game.title}</h1>
@@ -96,7 +97,7 @@ function InfoTiles({ game }: { game: Game }) {
       <InfoTile icon={CalendarDays} label="Date & time" value={formatGameDay(game.startDateTime)} detail={formatGameTimeRange(game.startDateTime, game.endDateTime)} />
       <InfoTile icon={MapPin} label="Location" value={location.venueName} detail={`${location.city}, ${location.state}`} />
       <InfoTile icon={Zap} label="Skill level" value={skillLevelLabel(game.skillLevel)} />
-      <InfoTile icon={Users} label="Spots" value={`${game.availableSpots} of ${game.capacity} left`} />
+      <InfoTile icon={Users} label={isTeamGame(game) ? "Teams" : "Players"} value={spotsLabel(game)} />
     </div>
   );
 }

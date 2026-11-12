@@ -69,7 +69,44 @@ describe("join panel", () => {
     renderPanel(buildGame(), { viewer: { firstName: "Sofia" } });
     await userEvent.click(await screen.findByRole("button", { name: "Request to join as Sofia" }));
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
-    expect(actions.joinAsMemberAction).toHaveBeenCalledWith("game_1");
+    expect(actions.joinAsMemberAction).toHaveBeenCalledWith("game_1", undefined);
+  });
+  it("registers a team as a guest captain, with the team name", async () => {
+    const game = buildGame({ registrationType: "TEAM" });
+    const calls = renderPanel(game, {}, [{ method: "POST", path: "/games/game_1/join", status: 201, body: success({ participant: { id: "p1", status: "PENDING", requestedAt: "" }, emailSent: true }) }]);
+    await userEvent.type(await screen.findByLabelText("Team name"), "Gobblers");
+    await userEvent.type(screen.getByLabelText("Captain name"), "Sofia Reyes");
+    await userEvent.type(screen.getByLabelText("Captain email"), "sofia@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Register your team" }));
+    expect(await screen.findByText("Team registration sent to Marcus T.")).toBeInTheDocument();
+    expect(calls.find((call) => call.method === "POST")?.body).toEqual({ name: "Sofia Reyes", email: "sofia@example.com", teamName: "Gobblers" });
+  });
+  it("requires a team name before registering a team", async () => {
+    const calls = renderPanel(buildGame({ registrationType: "TEAM" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Register your team" }));
+    expect(await screen.findByText("Team name is required.")).toBeInTheDocument();
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+  });
+  it("does not ask for a team name on PLAYER games", async () => {
+    renderPanel(buildGame());
+    expect(await screen.findByLabelText("Your name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument();
+  });
+  it("shows the server's message when a team-name rule fails without field details", async () => {
+    const game = buildGame({ registrationType: "TEAM" });
+    renderPanel(game, {}, [{ method: "POST", path: "/games/game_1/join", status: 400, body: failure("VALIDATION_ERROR", "A team name is required to join a team game.") }]);
+    await userEvent.type(await screen.findByLabelText("Team name"), "Gobblers");
+    await userEvent.type(screen.getByLabelText("Captain name"), "Sofia Reyes");
+    await userEvent.type(screen.getByLabelText("Captain email"), "sofia@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Register your team" }));
+    expect(await screen.findByText("A team name is required to join a team game.")).toBeInTheDocument();
+  });
+  it("lets a signed-in captain register a team by name", async () => {
+    actions.joinAsMemberAction.mockResolvedValue({ ok: true, data: { participant: { id: "p1", status: "PENDING", requestedAt: "" }, emailSent: true } });
+    renderPanel(buildGame({ registrationType: "TEAM" }), { viewer: { firstName: "Sofia" } });
+    await userEvent.type(await screen.findByLabelText("Team name"), "Gobblers");
+    await userEvent.click(screen.getByRole("button", { name: "Register your team" }));
+    expect(actions.joinAsMemberAction).toHaveBeenCalledWith("game_1", "Gobblers");
   });
   it("shows a signed-in player's pending request and lets them cancel it", async () => {
     actions.cancelMyRequestAction.mockResolvedValue({ ok: true, data: { participant: { id: "p1", status: "CANCELLED", requestedAt: "" } } });

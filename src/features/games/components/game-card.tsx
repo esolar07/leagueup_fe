@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { formatCost } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { skillLevelLabel } from "../game-state";
+import { isTeamGame, skillLevelLabel, TEAM_REGISTRATION_LABEL } from "../game-state";
 import type { Game } from "../types";
 import { CampaignBadge, GameMeta, MetaTag, SpotsMeter } from "./game-bits";
 
@@ -29,8 +29,9 @@ export function GameCard({ game, href, className }: { game: CardGame; href?: str
           <span className="flex flex-wrap items-center gap-1.5">
             {game.campaign && <CampaignBadge name={game.campaign.name} className="whitespace-nowrap sm:hidden" />}
             <MetaTag highlight>{skillLevelLabel(game.skillLevel)}</MetaTag>
+            {isTeamGame(game) && <MetaTag>{TEAM_REGISTRATION_LABEL}</MetaTag>}
           </span>
-          <span className="text-sm font-semibold text-primary">{formatCost(game.costCents)}</span>
+          <span className="text-sm font-semibold text-primary">{formatCost(game.costCents, game.costBasis)}</span>
         </div>
         <h3 className="leading-tight font-semibold">
           {href ? (

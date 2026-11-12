@@ -14,9 +14,11 @@ export function centsToDollars(cents: number): string {
   return fraction === 0 ? String(whole) : `${whole}.${String(fraction).padStart(2, "0")}`;
 }
 
-/** Display only — LeagueUp never takes payments. `null` means the organizer did not list a cost. */
-export function formatCost(costCents: number | null): string {
-  if (costCents === null) return "Cost not listed";
-  if (costCents === 0) return "Free";
-  return `$${centsToDollars(costCents)}`;
+const COST_BASIS_LABELS = { PER_PLAYER: "per player", PER_TEAM: "per team" } as const;
+
+/** Display only — LeagueUp never takes payments. "$20 per player"; a game with no price reads "Free". */
+export function formatCost(costCents: number | null, costBasis: keyof typeof COST_BASIS_LABELS | null = null): string {
+  if (!costCents) return "Free";
+  const price = `$${centsToDollars(costCents)}`;
+  return costBasis ? `${price} ${COST_BASIS_LABELS[costBasis]}` : price;
 }

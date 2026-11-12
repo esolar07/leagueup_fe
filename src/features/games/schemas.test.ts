@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGame } from "@/test/fixtures";
-import { diffGameChanges, EMPTY_LISTING, gameToFormValues, listingSchema, toSubmitGameInput, type ListingValues } from "./schemas";
+import { diffGameChanges, EMPTY_LISTING, gameToFormValues, guestJoinSchema, listingSchema, teamJoinSchema, toSubmitGameInput, type ListingValues } from "./schemas";
 
 const VALID: ListingValues = {
   ...EMPTY_LISTING,
@@ -19,6 +19,19 @@ function errorsFor(values: Partial<ListingValues>) {
   const result = listingSchema.safeParse({ ...VALID, ...values });
   return result.success ? {} : Object.fromEntries(result.error.issues.map((issue) => [issue.path.join("."), issue.message]));
 }
+
+describe("join payload", () => {
+  const guest = { name: "Sofia", email: "sofia@example.com", teamName: "Gobblers" };
+  it("keeps the team name for TEAM games", () => {
+    expect(teamJoinSchema.parse(guest)).toEqual(guest);
+  });
+  it("requires a team name for TEAM games", () => {
+    expect(teamJoinSchema.safeParse({ ...guest, teamName: " " }).success).toBe(false);
+  });
+  it("drops the team name for PLAYER games", () => {
+    expect(guestJoinSchema.parse(guest)).toEqual({ name: "Sofia", email: "sofia@example.com" });
+  });
+});
 
 describe("listing validation", () => {
   it("accepts a complete listing", () => {
@@ -59,16 +72,31 @@ describe("listing payload", () => {
       venueName: "Tropical Park",
       city: "Miami",
       state: "FL",
+      registrationType: "PLAYER",
       capacity: 14,
       skillLevel: "BEGINNER",
       costCents: 1050,
+      costBasis: "PER_PLAYER",
       organizerName: "Marcus T.",
       organizerEmail: "marcus@example.com",
       campaignSlug: "turkey-bowl-2026",
     });
   });
-  it("lists new games as Free by default", () => {
-    expect(toSubmitGameInput(listingSchema.parse(VALID)).costCents).toBe(0);
+  it("lists a TEAM game with capacity counted in teams", () => {
+    expect(toSubmitGameInput(listingSchema.parse({ ...VALID, registrationType: "TEAM", capacity: "8" }))).toMatchObject({ registrationType: "TEAM", capacity: 8 });
+  });
+  it("lists new games as Free by default, without a cost basis", () => {
+    const input = toSubmitGameInput(listingSchema.parse(VALID));
+    expect(input.costCents).toBe(0);
+    expect(JSON.parse(JSON.stringify(input))).not.toHaveProperty("costBasis");
+  });
+  it("sends the chosen basis with a price", () => {
+    const input = toSubmitGameInput(listingSchema.parse({ ...VALID, costType: "paid", cost: "120", costBasis: "PER_TEAM" }));
+    expect(input).toMatchObject({ costCents: 12000, costBasis: "PER_TEAM" });
+  });
+  it("drops the basis when a priced game is switched back to Free", () => {
+    const input = toSubmitGameInput(listingSchema.parse({ ...VALID, costType: "free", cost: "12", costBasis: "PER_TEAM" }));
+    expect(JSON.parse(JSON.stringify(input))).not.toHaveProperty("costBasis");
   });
   it("ignores a leftover price when the game is switched to Free", () => {
     expect(toSubmitGameInput(listingSchema.parse({ ...VALID, costType: "free", cost: "12" })).costCents).toBe(0);
@@ -92,6 +120,30 @@ describe("edit payload", () => {
   it("sends only changed fields, flat, with null for cleared optional fields", () => {
     const values = { ...gameToFormValues(game), title: "New name", address: "", costType: "free" as const, skillLevel: "" as const, capacity: "20" };
     expect(diffGameChanges(game, values)).toEqual({ title: "New name", address: null, costCents: 0, skillLevel: null, capacity: 20 });
+  });
+  it("prefills the basis from the game", () => {
+    expect(gameToFormValues(buildGame({ costCents: 12000, costBasis: "PER_TEAM" }))).toMatchObject({ costType: "paid", cost: "120", costBasis: "PER_TEAM" });
+  });
+  it("sends price and basis together when only the basis changes", () => {
+    const priced = buildGame({ costCents: 2000, costBasis: "PER_PLAYER" });
+    expect(diffGameChanges(priced, { ...gameToFormValues(priced), costBasis: "PER_TEAM" })).toEqual({ costCents: 2000, costBasis: "PER_TEAM" });
+  });
+  it("sends price and basis together when only the price changes", () => {
+    const priced = buildGame({ costCents: 2000, costBasis: "PER_TEAM" });
+    expect(diffGameChanges(priced, { ...gameToFormValues(priced), cost: "25" })).toEqual({ costCents: 2500, costBasis: "PER_TEAM" });
+  });
+  it("sends a basis when a free game gets a price", () => {
+    const free = buildGame({ costCents: 0 });
+    expect(diffGameChanges(free, { ...gameToFormValues(free), costType: "paid", cost: "20" })).toEqual({ costCents: 2000, costBasis: "PER_PLAYER" });
+  });
+  it("sends only the price when a priced game becomes free", () => {
+    const priced = buildGame({ costCents: 2000, costBasis: "PER_TEAM" });
+    expect(diffGameChanges(priced, { ...gameToFormValues(priced), costType: "free" })).toEqual({ costCents: 0 });
+  });
+  it("prefills and sends a switch between players and teams", () => {
+    const team = buildGame({ registrationType: "TEAM" });
+    expect(gameToFormValues(team).registrationType).toBe("TEAM");
+    expect(diffGameChanges(team, { ...gameToFormValues(team), registrationType: "PLAYER" })).toEqual({ registrationType: "PLAYER" });
   });
   it("sends startDateTime only when the start changes", () => {
     const changes = diffGameChanges(game, { ...gameToFormValues(game), startTime: "10:00" });

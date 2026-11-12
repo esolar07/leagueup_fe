@@ -2,6 +2,8 @@
 export type Sport = "FLAG_FOOTBALL";
 export type SkillLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
 export type GameStatus = "PUBLISHED" | "CLOSED" | "CANCELLED";
+export type CostBasis = "PER_PLAYER" | "PER_TEAM";
+export type RegistrationType = "PLAYER" | "TEAM";
 export type ParticipantStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
 export interface GameLocation {
@@ -21,8 +23,11 @@ export interface Game {
   status: GameStatus;
   skillLevel: SkillLevel | null;
   costCents: number | null;
+  costBasis: CostBasis | null;
   startDateTime: string;
   endDateTime: string | null;
+  /** PLAYER: capacity and availableSpots count players. TEAM: they count teams, and each request is one team. */
+  registrationType: RegistrationType;
   capacity: number;
   availableSpots: number;
   location: GameLocation;
@@ -38,6 +43,8 @@ export interface OwnParticipation {
 
 export interface ManagedParticipant extends OwnParticipation {
   name: string;
+  /** The team on TEAM games, where `name` is its captain. */
+  teamName: string | null;
 }
 
 export interface GameDetail {
@@ -68,9 +75,11 @@ export interface SubmitGameInput {
   city: string;
   state: string;
   postalCode?: string;
+  registrationType?: RegistrationType;
   capacity: number;
   skillLevel?: SkillLevel;
   costCents?: number;
+  costBasis?: CostBasis;
   organizerName: string;
   organizerEmail: string;
   campaignSlug?: string;
@@ -87,9 +96,11 @@ export interface UpdateGameInput {
   city?: string;
   state?: string;
   postalCode?: string | null;
+  registrationType?: RegistrationType;
   capacity?: number;
   skillLevel?: SkillLevel | null;
   costCents?: number | null;
+  costBasis?: CostBasis | null;
   status?: "PUBLISHED" | "CLOSED";
 }
 
@@ -98,4 +109,9 @@ export type GameSort = "startDateTime" | "-startDateTime" | "createdAt" | "-crea
 export interface GuestIdentity {
   name: string;
   email: string;
+}
+
+/** Body of POST /games/:id/join for guests. `teamName` is required on TEAM games and rejected on PLAYER games. */
+export interface GuestJoinInput extends GuestIdentity {
+  teamName?: string;
 }

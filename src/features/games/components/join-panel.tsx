@@ -2,9 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
+import { TextField } from "@/components/forms/text-field";
 import { ConfirmAction } from "@/components/shared/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +15,9 @@ import { ApiError } from "@/lib/api/client";
 import { friendlyErrorMessage } from "@/lib/api/error-messages";
 import { formatCost } from "@/lib/money";
 import { cancelMyRequestAction, joinAsMemberAction, type MemberActionResult } from "../actions";
-import { AVAILABILITY_COPY, availabilityOf } from "../game-state";
+import { AVAILABILITY_COPY, availabilityOf, isTeamGame } from "../game-state";
 import { gameKeys, useGameDetail } from "../hooks";
+import { teamNameSchema } from "../schemas";
 import type { Game, JoinResult, OwnParticipation } from "../types";
 import { SpotsMeter } from "./game-bits";
 import { GuestJoinForm } from "./guest-join-form";
@@ -58,8 +62,8 @@ export function JoinPanel({ slug, viewer, myParticipation }: JoinPanelProps) {
       <h2 id="join-title" className="sr-only">Join this game</h2>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Cost per player</p>
-          <p className="font-display text-4xl text-primary">{formatCost(game.costCents)}</p>
+          <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Cost</p>
+          <p className="font-display text-4xl text-primary">{formatCost(game.costCents, game.costBasis)}</p>
         </div>
         <SpotsMeter game={game} className="items-end" />
       </div>
@@ -97,7 +101,7 @@ function GuestJoinConfirmation({ game, emailSent }: { game: Game; emailSent: boo
   return (
     <div role="status" className="grid gap-3">
       <p className="flex items-center gap-2 text-lg font-semibold">
-        <CheckCircle2 className="size-5 text-primary" aria-hidden /> Request sent to {game.organizer.name}
+        <CheckCircle2 className="size-5 text-primary" aria-hidden /> {isTeamGame(game) ? "Team registration" : "Request"} sent to {game.organizer.name}
       </p>
       <p className="text-sm text-muted-foreground">{APPROVAL_NOTE}</p>
       <p className="text-sm text-muted-foreground">
@@ -112,18 +116,36 @@ function GuestJoinConfirmation({ game, emailSent }: { game: Game; emailSent: boo
 function MemberJoin({ game, viewer }: { game: Game; viewer: Viewer }) {
   const { pending, run } = useMemberAction();
   const [error, setError] = useState<string | null>(null);
-  async function join() {
+  async function join(teamName?: string) {
     setError(null);
-    await run(game.slug, () => joinAsMemberAction(game.id), "Request sent").catch((caught) => setError(friendlyErrorMessage(caught)));
+    const success = teamName ? "Team registration sent" : "Request sent";
+    await run(game.slug, () => joinAsMemberAction(game.id, teamName), success).catch((caught) => setError(friendlyErrorMessage(caught)));
   }
   return (
     <div className="grid gap-3">
-      <Button size="lg" className="w-full" onClick={join} disabled={pending}>
-        {pending && <Loader2 className="animate-spin" aria-hidden />} Request to join as {viewer.firstName}
-      </Button>
+      {isTeamGame(game) ? (
+        <MemberTeamJoin pending={pending} onJoin={join} />
+      ) : (
+        <Button size="lg" className="w-full" onClick={() => join()} disabled={pending}>
+          {pending && <Loader2 className="animate-spin" aria-hidden />} Request to join as {viewer.firstName}
+        </Button>
+      )}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <p className="text-sm text-muted-foreground">{APPROVAL_NOTE}</p>
     </div>
+  );
+}
+
+/** Signed-in captains name their team; name and email come from their account. */
+function MemberTeamJoin({ pending, onJoin }: { pending: boolean; onJoin: (teamName: string) => Promise<void> }) {
+  const form = useForm<{ teamName: string }>({ resolver: zodResolver(teamNameSchema), defaultValues: { teamName: "" } });
+  return (
+    <form onSubmit={form.handleSubmit(({ teamName }) => onJoin(teamName))} noValidate aria-label="Register your team" className="grid gap-3">
+      <TextField id="member-team-name" label="Team name" autoComplete="organization" registration={form.register("teamName")} error={form.formState.errors.teamName} />
+      <Button type="submit" size="lg" className="w-full" disabled={pending || form.formState.isSubmitting}>
+        {(pending || form.formState.isSubmitting) && <Loader2 className="animate-spin" aria-hidden />} Register your team
+      </Button>
+    </form>
   );
 }
 

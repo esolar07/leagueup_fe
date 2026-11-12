@@ -41,4 +41,11 @@ describe("games API client", () => {
     expect(calls[1].body).toBeUndefined();
     expect(calls[1].headers.get("Authorization")).toBe("Bearer jwt");
   });
+  it("sends the team name on TEAM joins, for guests and members", async () => {
+    const calls = mockApi([{ method: "POST", path: "/games/g1/join", status: 201, body: success({}) }]);
+    await gamesApi.joinAsGuest("g1", { name: "Sofia", email: "sofia@example.com", teamName: "Gobblers" });
+    await gamesApi.joinAsMember("g1", "jwt", "Gobblers");
+    expect(calls[0].body).toEqual({ name: "Sofia", email: "sofia@example.com", teamName: "Gobblers" });
+    expect(calls[1].body).toEqual({ teamName: "Gobblers" });
+  });
 });

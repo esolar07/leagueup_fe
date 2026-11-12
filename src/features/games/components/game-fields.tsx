@@ -12,6 +12,11 @@ import { SKILL_LEVEL_LABELS, SPORT_LABEL } from "../game-state";
 import type { GameFieldValues } from "../schemas";
 import { VenueFinder } from "./venue-finder";
 
+const REGISTRATION_OPTIONS: ChoiceOption<GameFieldValues["registrationType"]>[] = [
+  { value: "PLAYER", label: "Players" },
+  { value: "TEAM", label: "Teams" },
+];
+
 const SKILL_OPTIONS: ChoiceOption<GameFieldValues["skillLevel"]>[] = [
   { value: "", label: "All levels" },
   ...SKILL_LEVELS.map((level) => ({ value: level, label: SKILL_LEVEL_LABELS[level] })),
@@ -67,7 +72,7 @@ export function GameFields() {
         </div>
       </FormSection>
       <FormSection title="Players & cost">
-        <TextField id="capacity" label="Available players" inputMode="numeric" description="How many players you can take, 1 to 200." registration={register("capacity")} error={errors.capacity} />
+        <CapacityFields />
         <Controller
           control={control}
           name="skillLevel"
@@ -84,7 +89,12 @@ const COST_OPTIONS: ChoiceOption<GameFieldValues["costType"]>[] = [
   { value: "paid", label: "Paid" },
 ];
 
-/** Free / Paid, plus a price when Paid. Display only: players pay the organizer directly. */
+const COST_BASIS_OPTIONS: ChoiceOption<GameFieldValues["costBasis"]>[] = [
+  { value: "PER_PLAYER", label: "Per player" },
+  { value: "PER_TEAM", label: "Per team" },
+];
+
+/** Free / Paid, plus a price and a per player / per team basis when Paid. Display only: players pay the organizer directly. */
 function CostFields() {
   const { register, control, formState } = useFormContext<GameFieldValues>();
   const costType = useWatch({ control, name: "costType" });
@@ -94,11 +104,11 @@ function CostFields() {
       <Controller
         control={control}
         name="costType"
-        render={({ field }) => <ChoiceChips name="costType" legend="Cost per player" options={COST_OPTIONS} value={field.value} onChange={field.onChange} />}
+        render={({ field }) => <ChoiceChips name="costType" legend="Cost" options={COST_OPTIONS} value={field.value} onChange={field.onChange} />}
       />
       {costType === "paid" && (
         <Field data-invalid={Boolean(errors.cost)}>
-          <FieldLabel htmlFor="cost">Price per player</FieldLabel>
+          <FieldLabel htmlFor="cost">Price</FieldLabel>
           <div className="relative">
             <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" aria-hidden>
               $
@@ -108,9 +118,41 @@ function CostFields() {
           <FieldError id="cost-error" errors={[errors.cost]} />
         </Field>
       )}
+      {costType === "paid" && <CostBasisField />}
       <p id="cost-description" className="-mt-2 text-sm text-muted-foreground">
         Players pay you directly. LeagueUp doesn’t process payments.
       </p>
+    </>
+  );
+}
+
+function CostBasisField() {
+  const { control, formState } = useFormContext<GameFieldValues>();
+  return (
+    <Field data-invalid={Boolean(formState.errors.costBasis)}>
+      <Controller
+        control={control}
+        name="costBasis"
+        render={({ field }) => <ChoiceChips name="costBasis" legend="Price is charged" options={COST_BASIS_OPTIONS} value={field.value} onChange={field.onChange} />}
+      />
+      <FieldError errors={[formState.errors.costBasis]} />
+    </Field>
+  );
+}
+
+/** Players / Teams decides what capacity counts; each request on a TEAM game is one whole team. */
+function CapacityFields() {
+  const { register, control, formState } = useFormContext<GameFieldValues>();
+  const unit = useWatch({ control, name: "registrationType" }) === "TEAM" ? "teams" : "players";
+  return (
+    <>
+      <Controller
+        control={control}
+        name="registrationType"
+        render={({ field }) => <ChoiceChips name="registrationType" legend="Sign up as" options={REGISTRATION_OPTIONS} value={field.value} onChange={field.onChange} />}
+      />
+      <FieldError errors={[formState.errors.registrationType]} />
+      <TextField id="capacity" label={`${unit === "teams" ? "Teams" : "Players"} needed`} inputMode="numeric" description={`How many ${unit} you can take, 1 to 200.`} registration={register("capacity")} error={formState.errors.capacity} />
     </>
   );
 }
