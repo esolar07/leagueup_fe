@@ -33,7 +33,7 @@ export default function TurkeyBowlPage() {
           <Button size="lg" nativeButton={false} render={<Link href="#games" />}>
             Find a game
           </Button>
-          <Button size="lg" variant="outline" nativeButton={false} render={<Link href={`/list-your-game?campaign=${campaign.slug}`} />}>
+          <Button size="lg" variant="outline" nativeButton={false} render={<Link href="/list-your-game" />}>
             List your game
           </Button>
         </div>

@@ -1,16 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { Controller, FormProvider, useForm, useWatch, type Control } from "react-hook-form";
+import { FormProvider, useForm, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Loader2, Mail, TriangleAlert } from "lucide-react";
 import { applyApiError } from "@/components/forms/apply-api-error";
 import { TextField } from "@/components/forms/text-field";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { LISTABLE_CAMPAIGN } from "@/config/campaigns";
 import { easternToUtcIso } from "@/lib/datetime/eastern-time";
 import { gamesApi } from "../api";
@@ -28,9 +25,7 @@ export function ListingFlow() {
 }
 
 function ListingForm({ onSubmitted }: { onSubmitted: (receipt: ListingReceipt, email: string) => void }) {
-  const searchParams = useSearchParams();
-  const joinCampaign = searchParams.get("campaign") === LISTABLE_CAMPAIGN.slug;
-  const form = useForm<ListingValues>({ resolver: zodResolver(listingSchema), defaultValues: { ...EMPTY_LISTING, joinCampaign } });
+  const form = useForm<ListingValues>({ resolver: zodResolver(listingSchema), defaultValues: EMPTY_LISTING });
   const { errors, isSubmitting } = form.formState;
   async function onSubmit(values: ListingValues) {
     try {
@@ -45,18 +40,6 @@ function ListingForm({ onSubmitted }: { onSubmitted: (receipt: ListingReceipt, e
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="grid gap-4" aria-label="List your game">
           <GameFields />
-          <FormSection title="Turkey Bowl">
-            <Controller
-              control={form.control}
-              name="joinCampaign"
-              render={({ field }) => (
-                <div className="flex items-center justify-between gap-4">
-                  <Label htmlFor="joinCampaign">{LISTABLE_CAMPAIGN.listingLabel}</Label>
-                  <Switch id="joinCampaign" checked={field.value} onCheckedChange={field.onChange} />
-                </div>
-              )}
-            />
-          </FormSection>
           <FormSection title="About you" description="Players see your name. Your email is only used to confirm and manage this listing.">
             <TextField id="organizerName" label="Your name" autoComplete="name" registration={form.register("organizerName")} error={errors.organizerName} />
             <TextField id="organizerEmail" label="Your email" type="email" autoComplete="email" registration={form.register("organizerEmail")} error={errors.organizerEmail} />
@@ -90,7 +73,7 @@ function previewOf(values: ListingValues) {
     capacity,
     availableSpots: capacity,
     location: { venueName: values.venueName || "Park or field", address: null, city: values.city, state: values.state, postalCode: null },
-    campaign: values.joinCampaign ? { slug: LISTABLE_CAMPAIGN.slug, name: LISTABLE_CAMPAIGN.name } : null,
+    campaign: { slug: LISTABLE_CAMPAIGN.slug, name: LISTABLE_CAMPAIGN.name },
   };
 }
 

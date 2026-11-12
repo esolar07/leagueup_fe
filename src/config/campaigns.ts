@@ -9,7 +9,6 @@ export interface Campaign {
   eyebrow: string;
   headline: readonly [string, string, string];
   tagline: string;
-  listingLabel: string;
   /** Date shortcuts for the campaign's filter bar, as calendar days in game time (Eastern, inclusive). */
   datePresets: readonly CampaignDatePreset[];
 }
@@ -27,7 +26,6 @@ export const TURKEY_BOWL: Campaign = {
   eyebrow: "Thanksgiving · Thu, Nov 26",
   headline: ["Turkey", "Bowl.", "Let’s play."],
   tagline: "Thanksgiving football starts here.",
-  listingLabel: "Feature in the Turkey Bowl hub",
   datePresets: [
     { label: "Thanksgiving Day", from: "2026-11-26", until: "2026-11-26" },
     { label: "Thanksgiving weekend", from: "2026-11-26", until: "2026-11-29" },

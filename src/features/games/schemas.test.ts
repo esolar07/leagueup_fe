@@ -64,7 +64,7 @@ describe("listing validation", () => {
 
 describe("listing payload", () => {
   it("sends only API fields, in UTC, with cents and no empty optionals", () => {
-    const input = toSubmitGameInput(listingSchema.parse({ ...VALID, costType: "paid", cost: "10.50", skillLevel: "BEGINNER", state: "fl", joinCampaign: true }));
+    const input = toSubmitGameInput(listingSchema.parse({ ...VALID, costType: "paid", cost: "10.50", skillLevel: "BEGINNER", state: "fl" }));
     expect(JSON.parse(JSON.stringify(input))).toEqual({
       title: "Turkey Bowl 7v7",
       sport: "FLAG_FOOTBALL",
@@ -81,6 +81,9 @@ describe("listing payload", () => {
       organizerEmail: "marcus@example.com",
       campaignSlug: "turkey-bowl-2026",
     });
+  });
+  it("lists every game in the Turkey Bowl", () => {
+    expect(toSubmitGameInput(listingSchema.parse(VALID)).campaignSlug).toBe("turkey-bowl-2026");
   });
   it("lists a TEAM game with capacity counted in teams", () => {
     expect(toSubmitGameInput(listingSchema.parse({ ...VALID, registrationType: "TEAM", capacity: "8" }))).toMatchObject({ registrationType: "TEAM", capacity: 8 });

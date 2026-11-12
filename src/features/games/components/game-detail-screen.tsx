@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, MapPin, Share2, Users, Zap, Flag, TriangleAlert } from "lucide-react";
+import { CalendarDays, ChevronLeft, ExternalLink, Link2, MapPin, Users, Zap, Flag, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { GoogleMapDirectionsLink, GoogleMapPreview } from "@/components/maps/google-map-preview";
@@ -31,7 +31,7 @@ export function GameDetailScreen({ joinPanel }: { joinPanel: ReactNode }) {
       <GameHero game={game} />
       <aside className="grid content-start gap-4 lg:col-start-2 lg:row-span-3 lg:row-start-1">
         {joinPanel}
-        <ShareButton game={game} />
+        <ShareCard game={game} />
         <OrganizerCard game={game} />
       </aside>
       <InfoTiles game={game} />
@@ -124,16 +124,28 @@ function AboutGame({ game }: { game: Game }) {
   );
 }
 
-function ShareButton({ game }: { game: Game }) {
-  async function share() {
-    const url = `${window.location.origin}/games/${game.slug}`;
-    if (navigator.share) return navigator.share({ title: game.title, url }).catch(() => undefined);
-    await navigator.clipboard.writeText(url).then(() => toast.success("Link copied"), () => toast.error("Couldn’t copy the link"));
-  }
+const SHARE_BUTTON_CLASS = "h-11 rounded-full px-2 sm:px-4";
+
+/** Built on click, so the server and browser render the same markup. */
+function shareLinks(game: Game) {
+  const url = `${window.location.origin}/games/${game.slug}`;
+  const body = encodeURIComponent(`Join me at ${game.title}: ${url}`);
+  return { url, sms: `sms:?&body=${body}`, email: `mailto:?subject=${encodeURIComponent(game.title)}&body=${body}` };
+}
+
+/** Copy the link, or hand it to the device's messages or email app. */
+function ShareCard({ game }: { game: Game }) {
+  const copy = () => navigator.clipboard.writeText(shareLinks(game).url).then(() => toast.success("Link copied"), () => toast.error("Couldn’t copy the link"));
+  const open = (kind: "sms" | "email") => window.location.assign(shareLinks(game)[kind]);
   return (
-    <Button variant="outline" size="lg" className="w-full" onClick={share}>
-      <Share2 aria-hidden /> Share with friends
-    </Button>
+    <section aria-labelledby="share-title" className="rounded-lg border border-border bg-card p-4">
+      <h2 id="share-title" className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">Share</h2>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Button variant="outline" className={SHARE_BUTTON_CLASS} onClick={copy}><Link2 aria-hidden /> Copy link</Button>
+        <Button variant="outline" className={SHARE_BUTTON_CLASS} onClick={() => open("sms")}><Users aria-hidden /> Message</Button>
+        <Button variant="outline" className={SHARE_BUTTON_CLASS} onClick={() => open("email")}><ExternalLink aria-hidden /> Email</Button>
+      </div>
+    </section>
   );
 }
 

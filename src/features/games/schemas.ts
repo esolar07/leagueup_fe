@@ -99,13 +99,12 @@ export const API_FIELD_TO_FORM_FIELD: Record<string, keyof ListingValues> = {
   costBasis: "costBasis",
   organizerName: "organizerName",
   organizerEmail: "organizerEmail",
-  campaignSlug: "joinCampaign",
 };
 
 export const editGameSchema = z.object(gameFieldsShape).superRefine(checkGame);
 
 export const listingSchema = z
-  .object({ ...gameFieldsShape, joinCampaign: z.boolean(), organizerName: requiredLine("Your name", 120), organizerEmail: email })
+  .object({ ...gameFieldsShape, organizerName: requiredLine("Your name", 120), organizerEmail: email })
   .superRefine(checkGame);
 
 export const guestJoinSchema = z.object({ name: requiredLine("Your name", 120), email });
@@ -136,7 +135,6 @@ export const EMPTY_LISTING: ListingValues = {
   costType: "free",
   cost: "",
   costBasis: "PER_PLAYER",
-  joinCampaign: false,
   organizerName: "",
   organizerEmail: "",
 };
@@ -163,12 +161,11 @@ function toFlatGame(values: GameFieldValues): Required<Omit<UpdateGameInput, "st
   };
 }
 
-/** Optional fields are left out (not null) on create; JSON.stringify drops the undefined keys. */
+/** Optional fields are left out (not null) on create; JSON.stringify drops the undefined keys. Every new game joins the Turkey Bowl. */
 export function toSubmitGameInput(values: ListingValues): SubmitGameInput {
   const flat = toFlatGame(values);
   const optional = Object.fromEntries(Object.entries(flat).map(([key, value]) => [key, value ?? undefined]));
-  const campaignSlug = values.joinCampaign ? LISTABLE_CAMPAIGN.slug : undefined;
-  return { ...optional, sport: "FLAG_FOOTBALL", organizerName: values.organizerName, organizerEmail: values.organizerEmail, campaignSlug } as SubmitGameInput;
+  return { ...optional, sport: "FLAG_FOOTBALL", organizerName: values.organizerName, organizerEmail: values.organizerEmail, campaignSlug: LISTABLE_CAMPAIGN.slug } as SubmitGameInput;
 }
 
 export function gameToFormValues(game: Game): GameFieldValues {
