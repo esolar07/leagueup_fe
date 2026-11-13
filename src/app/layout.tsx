@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow_Condensed, Inter } from "next/font/google";
+import { ClarityScript } from "@/components/layout/clarity-script";
 import { Providers } from "@/components/layout/providers";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
         <Toaster position="top-center" richColors />
+        <ClarityScript />
       </body>
     </html>
   );
